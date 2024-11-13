@@ -5,27 +5,12 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/usdt.bpf.h>
 
-pid_t my_pid = 0;
-
-SEC("usdt/libc.so.6:libc:setjmp")
-int BPF_USDT(usdt_auto_attach, void *arg1, int arg2, void *arg3)
-{
-	pid_t pid = bpf_get_current_pid_tgid() >> 32;
-
-	if (pid != my_pid)
-		return 0;
-
-	bpf_printk("USDT auto attach to libc:setjmp: arg1 = %lx, arg2 = %d, arg3 = %lx", arg1, arg2,
-		   arg3);
+SEC("usdt/path/to/build/src/bitcoind:net:outbound_connection")
+int BPF_USDT(usdt_auto_attach, u64 id, void *addr, void *type, u64 network, u64 existing_connections) {
+	char address[5];
+	bpf_probe_read_user_str(address, sizeof(address), addr);
+	bpf_printk("outbound connection: id=%lx address5=%s", id, address);
 	return 0;
-}
-
-SEC("usdt")
-int BPF_USDT(usdt_manual_attach, void *arg1, int arg2, void *arg3)
-{
-	bpf_printk("USDT manual attach to libc:setjmp: arg1 = %lx, arg2 = %d, arg3 = %lx", arg1,
-		   arg2, arg3);
-	return 0;
-}
+};
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

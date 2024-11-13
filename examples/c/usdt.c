@@ -7,7 +7,6 @@
 #include "usdt.skel.h"
 
 static volatile sig_atomic_t exiting;
-static jmp_buf env;
 
 static void sig_int(int signo)
 {
@@ -17,11 +16,6 @@ static void sig_int(int signo)
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	return vfprintf(stderr, format, args);
-}
-
-static void usdt_trigger()
-{
-	setjmp(env);
 }
 
 int main(int argc, char **argv)
@@ -37,24 +31,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	skel->bss->my_pid = getpid();
-
 	err = usdt_bpf__load(skel);
 	if (!skel) {
 		fprintf(stderr, "Failed to load BPF skeleton\n");
 		return 1;
-	}
-
-	/*
-	 * Manually attach to libc.so we find.
-	 * We specify pid here, so we don't have to do pid filtering in BPF program.
-	 */
-	skel->links.usdt_manual_attach = bpf_program__attach_usdt(
-		skel->progs.usdt_manual_attach, getpid(), "libc.so.6", "libc", "setjmp", NULL);
-	if (!skel->links.usdt_manual_attach) {
-		err = errno;
-		fprintf(stderr, "Failed to attach BPF program `usdt_manual_attach`\n");
-		goto cleanup;
 	}
 
 	/*
@@ -78,7 +58,6 @@ int main(int argc, char **argv)
 
 	while (!exiting) {
 		/* trigger our BPF programs */
-		usdt_trigger();
 		fprintf(stderr, ".");
 		sleep(1);
 	}
